@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log"
 	"reflect"
-	"strings"
 )
 
 var (
@@ -41,8 +40,14 @@ var (
 	ErrNotHandled = errors.New("cannot compare the reflect.Kind")
 )
 
+type Difference struct {
+	ObjectPath []string
+	LeftValue  string
+	RightValue string
+}
+
 type cmp struct {
-	diff        []string
+	diff        []Difference
 	buff        []string
 	floatFormat string
 }
@@ -55,11 +60,11 @@ var errorType = reflect.TypeOf((*error)(nil)).Elem()
 //
 // If a type has an Equal method, like time.Equal, it is called to check for
 // equality.
-func Equal(a, b interface{}) []string {
+func Equal(a, b interface{}) []Difference {
 	aVal := reflect.ValueOf(a)
 	bVal := reflect.ValueOf(b)
 	c := &cmp{
-		diff:        []string{},
+		diff:        []Difference{},
 		buff:        []string{},
 		floatFormat: fmt.Sprintf("%%.%df", FloatPrecision),
 	}
@@ -351,10 +356,24 @@ func (c *cmp) pop() {
 
 func (c *cmp) saveDiff(aval, bval interface{}) {
 	if len(c.buff) > 0 {
-		varName := strings.Join(c.buff, ".")
-		c.diff = append(c.diff, fmt.Sprintf("%s: %v != %v", varName, aval, bval))
+
+		// copy this slice because slices in go share the same backing array even though the slice header itself is passed by value:
+		// https://stackoverflow.com/questions/39993688/are-golang-slices-pass-by-value
+		// otherwise further modifications to c.buff would modify ObjectPath on each Difference.
+		obejctPath := make([]string, len(c.buff))
+		copy(obejctPath, c.buff)
+
+		c.diff = append(c.diff, Difference{
+			ObjectPath: obejctPath,
+			LeftValue:  fmt.Sprintf("%v", aval),
+			RightValue: fmt.Sprintf("%v", bval),
+		})
 	} else {
-		c.diff = append(c.diff, fmt.Sprintf("%v != %v", aval, bval))
+		c.diff = append(c.diff, Difference{
+			ObjectPath: []string{},
+			LeftValue:  fmt.Sprintf("%v", aval),
+			RightValue: fmt.Sprintf("%v", bval),
+		})
 	}
 }
 
