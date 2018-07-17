@@ -360,8 +360,10 @@ func (c *cmp) saveDiff(aval, bval interface{}) {
 		// copy this slice because slices in go share the same backing array even though the slice header itself is passed by value:
 		// https://stackoverflow.com/questions/39993688/are-golang-slices-pass-by-value
 		// otherwise further modifications to c.buff would modify ObjectPath on each Difference.
-		obejctPath := make([]string, len(c.buff))
-		copy(obejctPath, c.buff)
+		obejctPath := make([]string, len(c.buff), len(c.buff))
+		for i, v := range c.buff {
+			obejctPath[i] = v
+		}
 
 		c.diff = append(c.diff, Difference{
 			ObjectPath: obejctPath,
